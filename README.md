@@ -27,7 +27,8 @@ hand:
 Frogfish works alongside other home screen add-ons such as
 [Owlfish](https://github.com/ccontino84/owlfish).
 
-**Status:** in development, no release yet.
+**Status:** released; what changed in each version is in
+[CHANGELOG.md](CHANGELOG.md).
 
 Frogfish was written with an AI coding assistant (Claude). It was designed,
 reviewed and tested on real devices by the author.

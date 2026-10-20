@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: LGPL-2.1-only
 
 Name:       frogfish
-Version:    1.0.0~alpha24
+Version:    1.0.0
 Release:    1
 Summary:    One-handed mode, zoom and back for the home screen
 License:    LGPL-2.1-only
