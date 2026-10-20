@@ -1,0 +1,26 @@
+{
+    "entries": [
+        {
+            "path": "system_settings/look_and_feel/frogfish",
+            "title": "Frogfish gestures",
+            "type": "page",
+            "icon": "image://theme/icon-m-frogfish-off",
+            "order": 281,
+            "params": {
+                "source": "/usr/share/jolla-settings/pages/frogfish/FrogfishPage.qml",
+                "allow_favorite": false
+            }
+        },
+        {
+            "path": "system_settings/look_and_feel/frogfish/onehanded_switch",
+            "title": "One-handed",
+            "type": "custom",
+            "icon": "image://theme/icon-m-frogfish-off",
+            "params": {
+                "source": "/usr/share/jolla-settings/pages/frogfish/OneHandedSwitch.qml",
+                "type": "grid",
+                "settings_path": "system_settings/look_and_feel/frogfish"
+            }
+        }
+    ]
+}

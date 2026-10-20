@@ -1,0 +1,52 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: 2026 ccontino84
+# SPDX-License-Identifier: LGPL-2.1-only
+#
+# Run by the RPM on every install and upgrade: creates 01-frogfish.conf,
+# which makes the home screen start the add-ons through the lipstickaddons
+# loader (lipstick-addons.md), unless the device's own configuration sets
+# QT_QPA_GENERIC_PLUGINS to something else. Frogfish then stays inactive
+# instead of taking the device's plugins away (a port's touch or keyboard
+# input, for example). Never fails the installation; exits 1 on a conflict.
+#
+# The value keeps "owlfish" for Owlfish versions that load only by their
+# own key: their file (00-owlfish.conf) sorts before this one, and this one
+# wins. Without Owlfish, Qt only logs that there is no such plugin.
+#
+#   update-env [directory, default /var/lib/environment/compositor]
+#
+# POSIX sh: RPM scriptlets may run in BusyBox.
+dir=${1:-/var/lib/environment/compositor}
+own=01-frogfish.conf
+ours=owlfish,lipstickaddons
+# The value lipstick gets without this file, the way systemd reads
+# EnvironmentFile=-.../*.conf: files sorted by name, the last assignment wins
+value=
+source=
+for file in "$dir"/*.conf; do
+    [ -f "$file" ] || continue
+    [ "${file##*/}" = "$own" ] && continue
+    pattern='^[[:space:]]*QT_QPA_GENERIC_PLUGINS[[:space:]]*='
+    grep -q "$pattern" "$file" || continue
+    value=$(sed -n "s/$pattern[[:space:]]*//p" "$file" | tail -n 1 \
+            | sed -e 's/[[:space:]]*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/")
+    source=$file
+done
+# Only the add-ons' own keys (with or without a specification) are ours to
+# replace; anything else belongs to the device
+conflict=
+for plugin in $(printf '%s' "$value" | tr 'A-Z' 'a-z' | tr ',' ' '); do
+    case ${plugin%%:*} in
+        owlfish|frogfish|lipstickaddons) ;;
+        *) conflict=1 ;;
+    esac
+done
+if [ -n "$conflict" ]; then
+    rm -f "$dir/$own"
+    echo "frogfish: installed but inactive: $source sets QT_QPA_GENERIC_PLUGINS. Please report it at https://github.com/ccontino84/frogfish/issues"
+    exit 1
+fi
+mkdir -p "$dir" \
+    && printf 'QT_QPA_GENERIC_PLUGINS=%s\n' "$ours" > "$dir/$own.new" \
+    && chmod 644 "$dir/$own.new" \
+    && mv -f "$dir/$own.new" "$dir/$own"

@@ -1,0 +1,115 @@
+# SPDX-FileCopyrightText: 2026 ccontino84
+# SPDX-License-Identifier: LGPL-2.1-only
+#
+# Run by hand (Actions > Release > Run workflow) on the release branch, after
+# setting the new Version in rpm/frogfish.spec and adding its entry to
+# CHANGELOG.md: runs the tests, builds the RPMs and creates the GitHub release
+# v<Version> with them attached, for that commit. main is fast-forwarded to it
+# only once this has worked (DEVELOPMENT.md, "Making a release"). The release
+# text is the changelog entry, followed by GitHub's generated notes
+# (contributors, full changelog link).
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: Create the release as a draft, to review before publishing
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+env:
+  # Sailfish SDK target the RPMs are built against; Qt 5.6.3 like 5.2.x
+  SFOS_RELEASE: 5.1.0.11
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.spec.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # All of the history, to compare the commit with main
+          fetch-depth: 0
+      - id: spec
+        run: |
+          version=$(sed -n 's/^Version:[[:space:]]*//p' rpm/frogfish.spec)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+            echo "::error::v$version already exists; raise Version in rpm/frogfish.spec"
+            exit 1
+          fi
+          if ! ci/release-notes.sh "$version" > /dev/null; then
+            echo "::error::CHANGELOG.md has no entry for $version"
+            exit 1
+          fi
+          # main must be able to fast-forward to the released commit
+          if ! git merge-base --is-ancestor origin/main HEAD; then
+            echo "::error::main has commits that $GITHUB_REF_NAME lacks; merge main into it first"
+            exit 1
+          fi
+
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Qt 5
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            qtbase5-dev qtbase5-dev-tools qt5-qmake qtdeclarative5-dev \
+            qml-module-qtquick2 qml-module-qtquick-window2 libgl1-mesa-dri xvfb xauth make g++ dbus
+      - name: Build
+        run: |
+          mkdir build
+          cd build
+          /usr/lib/qt5/bin/qmake ../frogfish.pro
+          make -j"$(nproc)"
+      - name: Test
+        run: |
+          cd build
+          for test in tests/core/tst_frogfish tests/gestures/tst_gestures; do
+            QT_QPA_PLATFORM=xcb QSG_RENDER_LOOP=basic dbus-run-session -- \
+              xvfb-run -a -s "-screen 0 640x480x24" ./$test
+          done
+
+  build:
+    needs: [version, test]
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        arch: [aarch64, armv7hl]
+    steps:
+      - uses: actions/checkout@v7
+      - run: ci/build-rpm.sh ${{ matrix.arch }} "$SFOS_RELEASE"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rpm-${{ matrix.arch }}
+          path: out/*.rpm
+          if-no-files-found: error
+
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          path: rpms
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+          DRAFT: ${{ inputs.draft && '--draft' || '' }}
+        run: |
+          gh release create "v$VERSION" rpms/*.rpm $DRAFT \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Frogfish $VERSION" \
+            --notes "$(ci/release-notes.sh "$VERSION")" --generate-notes

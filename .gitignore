@@ -1,0 +1,17 @@
+# sfdk builds in the source tree
+/RPMS/
+/.sfdk/
+/documentation.list
+Makefile
+*.o
+moc_*
+*.moc
+qrc_*
+/plugins/
+/tests/core/tst_frogfish
+/tests/gestures/tst_gestures
+generated/
+
+# host builds
+/build/
+/out/

@@ -1,0 +1,9 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/frogfish">
+        <file alias="Cue.qml">input/Cue.qml</file>
+        <file alias="Cover.qml">onehanded/Cover.qml</file>
+        <file alias="Colors.qml">zoom/Colors.qml</file>
+        <file alias="Overlay.qml">zoom/Overlay.qml</file>
+    </qresource>
+</RCC>
